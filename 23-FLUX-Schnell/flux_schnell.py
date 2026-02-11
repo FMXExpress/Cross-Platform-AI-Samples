@@ -8,6 +8,44 @@ from delphifmx import *
 
 class FluxSchnellApp(Form):
 
+    def __extract_output_urls(self, output):
+        urls = []
+
+        def collect(value):
+            if value is None:
+                return
+
+            if isinstance(value, str):
+                if value.startswith("http://") or value.startswith("https://"):
+                    urls.append(value)
+                return
+
+            if isinstance(value, list):
+                for item in value:
+                    collect(item)
+                return
+
+            if isinstance(value, dict):
+                if "url" in value:
+                    collect(value.get("url"))
+                if "output" in value:
+                    collect(value.get("output"))
+                return
+
+            file_url = getattr(value, "url", None)
+            if callable(file_url):
+                file_url = file_url()
+            if file_url:
+                collect(file_url)
+                return
+
+            text_value = str(value)
+            if text_value.startswith("http://") or text_value.startswith("https://"):
+                urls.append(text_value)
+
+        collect(output)
+        return urls
+
     def __init__(self, owner):
         self.stylemanager = StyleManager(self)
         if os.path.exists("Air.style"):
@@ -209,17 +247,7 @@ class FluxSchnellApp(Form):
                 self.timer.Enabled = False
                 output = self.prediction.output
 
-                urls = []
-                if isinstance(output, list):
-                    urls = [u for u in output if isinstance(u, str)]
-                elif isinstance(output, str):
-                    urls = [output]
-                elif isinstance(output, dict):
-                    first = output.get("output")
-                    if isinstance(first, list):
-                        urls = [u for u in first if isinstance(u, str)]
-                    elif isinstance(first, str):
-                        urls = [first]
+                urls = self.__extract_output_urls(output)
 
                 if not urls:
                     self.status_bar.Text = "Status: Error - No image URL in output."
